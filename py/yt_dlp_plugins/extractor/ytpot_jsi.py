@@ -61,8 +61,6 @@ class PhantomJSWebPTP(PoTokenProvider):
                     )*
                 (?P=q))\s*;''',
                 request.video_webpage, 'raw challenge data',  default=None, group='raw_cd')
-            with open('../tmp/challenge_data.txt', 'w') as f:
-                f.write(raw_challenge_data)
             content_binding = get_webpo_content_binding(request)[0]
             self.logger.trace(f'Generating WebPO for content binding: {content_binding}')
             # The PhantomJS wrapper will log to info for us
