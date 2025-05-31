@@ -1,4 +1,4 @@
-A yt-dlp GetPOT plugin that attempts to generate POT with the phantomjs Javascript Interpreter.
+A yt-dlp plugin that attempts to generate POT with the phantomjs Javascript Interpreter.
 
 Current status: works with an HTTP server on the python side.
 
@@ -7,7 +7,7 @@ The core JS code is located in [pot_http.es5.js](<js/src/pot_http.es5.cjs>).
 # Installing
 
 ## Requirements
-1. yt-dlp **`2025.XX.XX`** or above (no such release yet, needs yt-dlp/yt-dlp#12840)
+1. yt-dlp **`2025.05.22`** or above
 2. PhantomJS **`1.9.0`** or above
 
 ## Installing PhantomJS
