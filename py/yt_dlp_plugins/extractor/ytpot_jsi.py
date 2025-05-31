@@ -13,7 +13,7 @@ from yt_dlp.extractor.youtube.pot.utils import WEBPO_CLIENTS, get_webpo_content_
 from ..getpot_phantomjs.fetch_pot import construct_jsi, fetch_pot
 import traceback
 
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 
 
 @register_provider
