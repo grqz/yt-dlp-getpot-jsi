@@ -4,4 +4,4 @@ tmp/
 bundle
 dist
 venv
-/py/yt_dlp_plugins/getpot_phantomjs/script.py
+/py/yt_dlp_plugins/getpot_phantomjs/_script.py

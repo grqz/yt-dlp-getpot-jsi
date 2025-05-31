@@ -3,6 +3,10 @@
 //     "port": 12345,
 //     "content_bindings": ["dQw4w9WgXcQ"]
 // };
+// embeddedInputData.ytAtR = JSON.parse('\x7b\x7d');
+if (embeddedInputData.ytAtR !== null) {
+    console.log('globalName:', embeddedInputData.ytAtR.bgChallenge.globalName);
+}
 
 var globalObj = (typeof globalThis !== 'undefined') ? globalThis :
     (typeof global !== 'undefined') ? global :
