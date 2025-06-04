@@ -1,8 +1,8 @@
 A yt-dlp plugin that attempts to generate POT with the phantomjs Javascript Interpreter.
 
-Current status: works with an HTTP server on the python side.
+The javascript part is basically a backport of [LuanRT/BgUtils](https://github.com/LuanRT/BgUtils). The [_Research_](https://github.com/LuanRT/BgUtils?tab=readme-ov-file#research) section of its README helped a lot when developing this plugin.
 
-The core JS code is located in [pot_http.es5.js](<js/src/pot_http.es5.cjs>).
+Current status: works with an HTTP server on the python side, ideally making only one request.
 
 # Installing
 
@@ -53,4 +53,4 @@ For more locations and methods, see [installing yt-dlp plugins](<https://github.
 
 If installed correctly, you should see the provider's version in `yt-dlp -v` output:
 
-    [debug] [youtube] [pot] PO Token Providers: phantomjs-web-0.2.1 (external)
+    [debug] [youtube] [pot] PO Token Providers: phantomjs-web-0.3.0 (external)
