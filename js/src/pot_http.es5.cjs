@@ -15,7 +15,7 @@ var globalObj = (typeof globalThis !== 'undefined') ? globalThis :
             (typeof self !== 'undefined') ? self :
                 this;
 
-var writeError, writeDebug, writeLog, nop = function () {}, exit;
+var writeError, writeDebug, writeLog, nop = function () { }, exit;
 if (typeof phantomInnerAPI !== 'undefined') {
     exit = phantomInnerAPI.exit;
     writeError = phantomInnerAPI.writeError;
@@ -390,9 +390,7 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
             }, function (err) {
                 writeError('Snapshot failed:', err);
                 exit(1);
-            }, bg.vmFns, {
-                webPoSignalOutput: webPoSignalOutput
-            });
+            }, bg.vmFns, { webPoSignalOutput: webPoSignalOutput });
         }, function (err) {
             writeError('Error loading VM', err);
             exit(1);
