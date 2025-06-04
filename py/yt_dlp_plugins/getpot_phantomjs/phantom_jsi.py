@@ -2,10 +2,13 @@ import subprocess
 from yt_dlp.utils import shell_quote, format_field, ExtractorError, Popen
 from yt_dlp.extractor.openload import PhantomJSwrapper
 
+from .utils import timed
+
 
 class PhantomJSWrapperWithCustomArgs(PhantomJSwrapper):
     _BASE_JS = PhantomJSwrapper._BASE_JS.replace('{{', '{').replace('}}', '}')
 
+    @timed
     def execute(self, jscode, video_id=None, *, note='Executing JS', phantom_args=None, script_args=None):
         """Execute JS file and return stdout"""
         if 'phantom.exit();' not in jscode:

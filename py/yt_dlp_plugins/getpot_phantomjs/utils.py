@@ -1,5 +1,10 @@
 import json
+import time
+import functools
+from yt_dlp.utils import IDENTITY
 from yt_dlp.utils.traversal import traverse_obj, value
+
+from .debug import NDEBUG
 
 USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36(KHTML, like Gecko)'
 GOOG_API_KEY = 'AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw'
@@ -105,3 +110,18 @@ class BG:
             'mintRefreshThreshold': 2,
             'websafeFallbackToken': 3,
         })
+
+
+if NDEBUG:
+    timed = IDENTITY
+else:
+    def timed(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            start = time.perf_counter()
+            try:
+                return func(*args, **kwargs)
+            finally:
+                end = time.perf_counter()
+                print(f'{func.__name__} took {end - start:.6f} seconds')
+        return wrapper
