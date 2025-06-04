@@ -23,7 +23,8 @@ def fetch_pots(ie, content_bindings, Request, urlopen, phantom_jsi=None, log=don
         script = make_script({
             'port': pot_server.port,
             'content_bindings': content_bindings,
-        }, challenge_data)
+            'NDEBUG': True,
+        }, raw_challenge_data=challenge_data)
         return traverse_obj(
             script, ({phantom_jsi.execute}, {lambda x: log(f'PhantomJS stdout: {x}') or x},
                      {str.splitlines}, -1, {str.strip}, {json.loads}))

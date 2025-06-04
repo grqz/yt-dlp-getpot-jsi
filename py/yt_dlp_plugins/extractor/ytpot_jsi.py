@@ -1,6 +1,5 @@
 from yt_dlp.networking.common import Request
 from yt_dlp.extractor.youtube.pot.provider import (
-    ExternalRequestFeature,
     PoTokenContext,
     PoTokenProvider,
     PoTokenProviderError,
