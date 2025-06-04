@@ -4,9 +4,10 @@
 //     "content_bindings": ["dQw4w9WgXcQ"]
 // };
 // embeddedInputData.ytAtR = JSON.parse('\x7b\x7d');
-if (embeddedInputData.ytAtR !== null) {
-    console.log('globalName:', embeddedInputData.ytAtR.bgChallenge.globalName);
-}
+
+// yt-dlp's PhantomJSwrapper relies on
+// `'phantom.exit();' in jscode`
+// phantom.exit();
 
 var globalObj = (typeof globalThis !== 'undefined') ? globalThis :
     (typeof global !== 'undefined') ? global :
@@ -14,25 +15,52 @@ var globalObj = (typeof globalThis !== 'undefined') ? globalThis :
             (typeof self !== 'undefined') ? self :
                 this;
 
-if ((typeof process !== 'undefined') &&
-    (typeof process.versions.node !== 'undefined')) {
-    var jsdom = require('jsdom');
-    var dom = new jsdom.JSDOM();
-    Object.assign(globalObj, {
-        window: dom.window,
-        document: dom.window.document
-    });
+var writeError, writeDebug, writeLog, nop = function () {}, exit;
+if (typeof phantomInnerAPI !== 'undefined') {
+    exit = phantomInnerAPI.exit;
+    writeError = phantomInnerAPI.writeError;
+    writeLog = phantomInnerAPI.writeLog;
+    if (embeddedInputData.NDEBUG) {
+        writeDebug = nop;
+        phantomInnerAPI.disableConsoleMsg();
+    } else {
+        writeDebug = phantomInnerAPI.writeDebug;
+    }
+} else {
+    writeError = function () { return console.trace.apply(console, arguments); };
+    writeDebug = embeddedInputData.NDEBUG ? nop : function () { return console.debug.apply(console, arguments); };
+    writeLog = function () { return console.log.apply(console, arguments); };
+    if (typeof phantom !== 'undefined')
+        exit = function () { return phantom.exit.apply(phantom, arguments); };
+    else if (typeof process !== 'undefined') {
+        exit = function () { return process.exit.apply(process, arguments); };
+        var JSDOM = require('jsdom').JSDOM;
+        var dom = new JSDOM('<!DOCTYPE html><html lang="en"><head><title></title></head><body></body></html>', {
+            url: 'https://www.youtube.com/',
+            referrer: 'https://www.youtube.com/',
+            userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36(KHTML, like Gecko)'
+        });
+
+        Object.assign(globalThis, {
+            window: dom.window,
+            document: dom.window.document,
+            location: dom.window.location,
+            origin: dom.window.origin
+        });
+
+        if (!Reflect.has(globalThis, 'navigator')) {
+            Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator });
+        }
+        // for debugging
+        embeddedInputData.port = process.args && process.args[2] || 3200;
+    }
+    else
+        exit = nop;
 }
 
-function exit(code) {
-    if (typeof phantom !== 'undefined') {
-        // phantom.exit();
-        phantom.exit(code);
-        // yt-dlp's PhantomJSwrapper relies on
-        // `'phantom.exit();' in jscode`
-    } else if (typeof process !== 'undefined')
-        process.exit(code);
-}
+// Currently, we only support fetch for a custom UA
+// TODO: do requests natively
+var doRequestsNatively = typeof fetch === 'function';
 
 function compatFetch(resolve, reject, url, req) {
     req = req || {};
@@ -40,6 +68,7 @@ function compatFetch(resolve, reject, url, req) {
     req.headers = req.headers || {};
     req.body = req.body || null;
     if (typeof fetch === 'function') {
+        writeDebug('FETCH', url);
         fetch(url, req).then(function (response) {
             return {
                 ok: response.ok,
@@ -58,10 +87,13 @@ function compatFetch(resolve, reject, url, req) {
             };
         }).then(resolve).catch(reject);
     } else if (typeof XMLHttpRequest !== 'undefined') {
+        writeDebug('XHR', url);
         xhr = new XMLHttpRequest();
         xhr.open(req.method, url, true);
-        for (var hdr in req.headers)
+        for (var hdr in req.headers) {
+            if (hdr.toLowerCase() === 'user-agent') return reject('UA not supported');
             xhr.setRequestHeader(hdr, req.headers[hdr]);
+        }
         var doneCallbacks = [];
         xhr.onreadystatechange = function () {
             if (xhr.readyState === 2) {
@@ -92,7 +124,7 @@ function compatFetch(resolve, reject, url, req) {
                 });
             } else if (xhr.readyState === 4) {
                 doneCallbacks = doneCallbacks.filter(function (x) {
-                    if (x)
+                    if (typeof x === 'function')
                         x(xhr.responseText);
                     return false;
                 });
@@ -169,6 +201,44 @@ function encodeASCII(str) {
     return ret;
 }
 
+function buildPOTServerURL(path) {
+    return 'http://127.0.0.1:'.concat(embeddedInputData.port, path);
+}
+
+function fetchChallenge(resolve, reject) {
+    if (embeddedInputData.ytAtR !== null) {
+        var interpUrl = embeddedInputData.ytAtR.bgChallenge.interpreterUrl.privateDoNotAccessOrElseTrustedResourceUrlWrappedValue;
+        compatFetch(function (respRaw) {
+            if (!respRaw.ok)
+                return reject(new Error('Could not get challenge'));
+            respRaw.text(function (respText) {
+                var bgChallenge = embeddedInputData.ytAtR.bgChallenge;
+                resolve({
+                    ijs: respText,
+                    uie: bgChallenge.userInteractionElement,
+                    vmn: bgChallenge.globalName,
+                    prg: bgChallenge.program
+                });
+            }, reject);
+        }, reject, 'https:'.concat(interpUrl));
+    } else {
+        compatFetch(function (respRaw) {
+            if (!respRaw.ok)
+                return reject(new Error('Could not get challenge'));;
+            respRaw.json(function (respJson) {
+                if (!respJson || respJson.error)
+                    return reject(new Error('Could not get challenge' + (respJson && respJson.error && ': '.concat(respJson.error)) || ''));
+                resolve({
+                    ijs: respJson.interpreterJavascript.privateDoNotAccessOrElseSafeScriptWrappedValue,
+                    uie: respJson.userInteractionElement,
+                    vmn: respJson.globalName,
+                    prg: respJson.program
+                });
+            }, reject);
+        }, reject, buildPOTServerURL('/descrambled'));
+    }
+}
+
 function load(resolve, reject, vm, program, userInteractionElement) {
     if (!vm)
         reject(new Error('VM not found'));
@@ -196,28 +266,34 @@ function load(resolve, reject, vm, program, userInteractionElement) {
         asyncResolved = true;
         maybeDone();
     }
-    syncSnapshotFunction = vm.a(program, vmFunctionsCallback, true, userInteractionElement, function () { }, [[], []])[0];
+    syncSnapshotFunction = vm.a(program, vmFunctionsCallback, true, userInteractionElement, nop, [[], []])[0];
     syncResolved = true;
     maybeDone();
 }
 
 function snapshot(resolve, reject, vmFns, args, timeout) {
     timeout = (typeof timeout === 'undefined') ? 3000 : timeout;
+    if (!vmFns.asyncSnapshotFunction)
+        return reject(new Error('Asynchronous snapshot function not found'));
     var timeoutId;
+    var resolved = false;
     function resolveWrapped(x) {
+        if (resolved) return writeDebug('SSHOT_MULTICB RESOLVE');
+        resolved = true;
         clearTimeout(timeoutId);
+        writeDebug('TYPEOF_WPSO', typeof args.webPoSignalOutput[0]);
         resolve(x);
     }
     function rejectWrapped(x) {
+        if (resolved) return writeDebug('SSHOT_MULTICB REJECT');
+        resolved = true;
         clearTimeout(timeoutId);
         reject(x);
     }
     timeoutId = setTimeout(function () {
-        reject(new Error('VM operation timed out'));
+        rejectWrapped(new Error('VM operation timed out'));
     }, timeout);
-    if (!vmFns.asyncSnapshotFunction)
-        return rejectWrapped(new Error('Asynchronous snapshot function not found'));
-    vmFns.asyncSnapshotFunction(function (response) { resolveWrapped(response) }, [
+    vmFns.asyncSnapshotFunction(resolveWrapped, [
         args.contentBinding,
         args.signedTimestamp,
         args.webPoSignalOutput,
@@ -238,98 +314,101 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
         var result = mintCallback(encodeASCII(identifier));
         if (!result)
             rejectInner(new Error('YNJ:Undefined'));
-        // do we need to test if result is a U8arr?
+        if (!(result instanceof Uint8Array))
+            rejectInner(new Error('ODM:Invalid'));
         resolveInner(UTF8ArrToB64(result, true));
     });
 }
 
-function buildPOTServerURL(path) {
-    return 'http://127.0.0.1:'.concat(embeddedInputData.port, path);
-}
-
 (function () {
+    writeDebug('FUNC');
     var identifiers = embeddedInputData.content_bindings;
     if (!identifiers.length) {
-        console.log('[]');
+        writeLog('[]');
         exit(0);
     }
-    compatFetch(function (bgChallengeRaw) {
-        bgChallengeRaw.json(function (bgChallenge) {
-            if (!bgChallengeRaw.ok || !bgChallenge) {
-                console.error('Could not get challenge:', (bgChallenge && bgChallenge.error) || '');
-                exit(1);
-            }
-
-            var interpreterJavascript = bgChallenge.interpreterJavascript.privateDoNotAccessOrElseSafeScriptWrappedValue;
-            if (interpreterJavascript) {
-                new Function(interpreterJavascript)();
-            } else {
-                console.error('Could not load VM');
-                exit(1);
-            }
-
-            load(
-                function (bg) {
-                    var webPoSignalOutput = [];
-                    snapshot(function (botguardResponse) {
-                        compatFetch(function (integrityTokenResponse) {
-                            integrityTokenResponse.json(function (integrityTokenJson) {
-                                if (!integrityTokenResponse.ok || !integrityTokenJson) {
-                                    console.error('Failed to get integrity token response:', (integrityTokenResponse && integrityTokenResponse.error) || '')
-                                    exit(1);
+    // compatFetch(function (bgChallengeRaw) {
+    fetchChallenge(function (chl) {
+        writeDebug('CHL');
+        // if (!bgChallengeRaw.ok || !bgChallenge) {
+        //     writeError('Could not get challenge:', (bgChallenge && bgChallenge.error) || '');
+        //     exit(1);
+        // }
+        if (chl.ijs) {
+            new Function(chl.ijs)();
+        } else {
+            writeError('Could not load VM');
+            exit(1);
+        }
+        writeDebug('VM_LOADED', JSON.stringify(globalObj[chl.vmn]));
+        writeDebug('VM_INIT_FN', globalObj[chl.vmn] && typeof globalObj[chl.vmn].a);
+        load(function (bg) {
+            writeDebug('LD');
+            var webPoSignalOutput = [];
+            snapshot(function (botguardResponse) {
+                writeDebug('SSHOT', botguardResponse);
+                compatFetch(function (integrityTokenResponse) {
+                    writeDebug('IT');
+                    integrityTokenResponse.json(function (integrityTokenJson) {
+                        writeDebug('ITJ', JSON.stringify(integrityTokenJson));
+                        if (!integrityTokenResponse.ok || !integrityTokenJson) {
+                            writeError('Failed to get integrity token response:', (integrityTokenResponse && integrityTokenResponse.error) || '')
+                            exit(1);
+                        }
+                        if (typeof integrityTokenJson.integrityToken !== 'string') {
+                            writeError('Could not get integrity token');
+                            exit(1);
+                        }
+                        getWebSafeMinter(function (webSafeMinter) {
+                            var pots = [];
+                            function exitIfCompleted() {
+                                if (Object.keys(pots).length == identifiers.length) {
+                                    writeLog(JSON.stringify(pots));
+                                    exit(+(pots.indexOf(null) !== -1));
                                 }
-                                getWebSafeMinter(function (webSafeMinter) {
-                                    var pots = [];
-                                    function exitIfCompleted() {
-                                        if (Object.keys(pots).length == identifiers.length) {
-                                            console.log(JSON.stringify(pots));
-                                            exit(+(pots.indexOf(null) !== -1));
-                                        }
-                                    }
-                                    identifiers.forEach(function (identifier, idx) {
-                                        webSafeMinter(function (pot) {
-                                            pots[idx] = pot;
-                                            exitIfCompleted();
-                                        }, function (err) {
-                                            console.error(
-                                                'Failed to mint web-safe POT for identifier '.concat(identifier, ':'), err);
-                                            pots[idx] = null;
-                                            exitIfCompleted();
-                                        }, identifier);
-                                    });
+                            }
+                            identifiers.forEach(function (identifier, idx) {
+                                webSafeMinter(function (pot) {
+                                    pots[idx] = pot;
+                                    exitIfCompleted();
                                 }, function (err) {
-                                    console.error('Failed to get web-safe minter:', err);
-                                    exit(1);
-                                }, integrityTokenJson, webPoSignalOutput);
-                            }, function (err) {
-                                console.error('Failed to parse JSON:', err);
-                                exit(1);
+                                    writeError(
+                                        'Failed to mint web-safe POT for identifier '.concat(identifier, ':'), err);
+                                    pots[idx] = null;
+                                    exitIfCompleted();
+                                }, identifier);
                             });
                         }, function (err) {
-                            console.error('Failed to fetch integrity token response:', err);
+                            writeError('Failed to get web-safe minter:', err);
                             exit(1);
-                        }, buildPOTServerURL('/genit'), {
-                            method: 'POST',
-                            body: JSON.stringify(botguardResponse)
-                        });
+                        }, integrityTokenJson, webPoSignalOutput);
                     }, function (err) {
-                        console.error('snapshot failed:', err);
+                        writeError('Failed to parse JSON:', err);
                         exit(1);
-                    }, bg.vmFns, {
-                        webPoSignalOutput: webPoSignalOutput
-                    })
+                    });
                 }, function (err) {
-                    console.error('Error loading VM', err);
+                    writeError('Failed to fetch integrity token response:', err);
                     exit(1);
-                },
-                globalObj[bgChallenge.globalName],
-                bgChallenge.program, bgChallenge.userInteractionElement);
+                }, buildPOTServerURL('/genit'), {
+                    method: 'POST',
+                    body: JSON.stringify(botguardResponse)
+                });
+            }, function (err) {
+                writeError('Snapshot failed:', err);
+                exit(1);
+            }, bg.vmFns, {
+                webPoSignalOutput: webPoSignalOutput
+            });
         }, function (err) {
-            console.error('Failed to parse challenge:', err);
+            writeError('Error loading VM', err);
             exit(1);
-        });
+        }, globalObj[chl.vmn], chl.prg, chl.uie);
     }, function (err) {
-        console.error('Failed to fetch challenge:', err);
+        writeError('Failed to parse challenge:', err);
         exit(1);
-    }, buildPOTServerURL('/descrambled'));
+    });
+    // }, function (err) {
+    //     writeError('Failed to fetch challenge:', err);
+    //     exit(1);
+    // }, buildPOTServerURL('/descrambled'));
 })();

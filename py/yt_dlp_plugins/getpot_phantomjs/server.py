@@ -3,6 +3,7 @@ import socket
 import threading
 import traceback
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse
 from .utils import BG
 
 
@@ -15,7 +16,9 @@ class POTHTTPServer:
                 log(f'[HTTP Server] {format % args}')
 
             def do_GET(self):
-                if self.path.lower() == '/descrambled':
+                parsed_url = urlparse(self.path)
+                real_path = parsed_url.path.lower()
+                if real_path == '/descrambled':
                     try:
                         descrambled = json.dumps(bg.fetch_challenge()).encode()
                     except Exception as e:
@@ -77,11 +80,11 @@ class POTHTTPServer:
                         'error': f'Cannot POST {self.path}',
                     }).encode())
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('localhost', port))
+        sock.bind(('127.0.0.1', port))
         free_port = sock.getsockname()[1]
         sock.listen(5)
 
-        server = HTTPServer(('localhost', free_port), SimpleHandler, False)
+        server = HTTPServer(('127.0.0.1', free_port), SimpleHandler, False)
         server.socket = sock
         server.server_close = lambda: sock.close()
         thread = threading.Thread(target=server.serve_forever, daemon=True)
