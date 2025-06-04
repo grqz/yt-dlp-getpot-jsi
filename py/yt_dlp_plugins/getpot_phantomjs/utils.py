@@ -112,8 +112,8 @@ class BG:
 
 
 if NDEBUG:
-    def timed(*args, **kwargs):
-        pass
+    def timed(func):
+        return func
 else:
     def timed(func):
         @functools.wraps(func)
