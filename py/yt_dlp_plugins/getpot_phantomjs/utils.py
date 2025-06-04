@@ -1,7 +1,6 @@
 import json
 import time
 import functools
-from yt_dlp.utils import IDENTITY
 from yt_dlp.utils.traversal import traverse_obj, value
 
 from .debug import NDEBUG
@@ -113,7 +112,8 @@ class BG:
 
 
 if NDEBUG:
-    timed = IDENTITY
+    def timed(*args, **kwargs):
+        pass
 else:
     def timed(func):
         @functools.wraps(func)
