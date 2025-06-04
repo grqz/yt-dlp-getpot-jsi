@@ -41,16 +41,15 @@ if (typeof phantomInnerAPI !== 'undefined') {
             userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36(KHTML, like Gecko)'
         });
 
-        Object.assign(globalThis, {
+        Object.assign(globalObj, {
             window: dom.window,
             document: dom.window.document,
             location: dom.window.location,
             origin: dom.window.origin
         });
 
-        if (!Reflect.has(globalThis, 'navigator')) {
-            Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator });
-        }
+        if (!Reflect.has(globalObj, 'navigator'))
+            Object.defineProperty(globalObj, 'navigator', { value: dom.window.navigator });
         // for debugging
         embeddedInputData.port = process.args && process.args[2] || 3200;
     }
@@ -327,13 +326,8 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
         writeLog('[]');
         exit(0);
     }
-    // compatFetch(function (bgChallengeRaw) {
     fetchChallenge(function (chl) {
         writeDebug('CHL');
-        // if (!bgChallengeRaw.ok || !bgChallenge) {
-        //     writeError('Could not get challenge:', (bgChallenge && bgChallenge.error) || '');
-        //     exit(1);
-        // }
         if (chl.ijs) {
             new Function(chl.ijs)();
         } else {
@@ -407,8 +401,4 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
         writeError('Failed to parse challenge:', err);
         exit(1);
     });
-    // }, function (err) {
-    //     writeError('Failed to fetch challenge:', err);
-    //     exit(1);
-    // }, buildPOTServerURL('/descrambled'));
 })();

@@ -22,16 +22,12 @@
             return ret;
         }
         var fnMap = {
-            exit: function (code) {
-                if (typeof phantom !== 'undefined')
-                    phantom.exit(code);
-            },
+            exit: function (code) { return phantom.exit(code); },
             writeError: function () { return console.trace.apply(console, arguments); },
             writeDebug: function () { return console.debug.apply(console, arguments); },
             writeLog: function () { return console.log.apply(console, arguments); },
-            disableConsoleMsg: function () {
-                page.onConsoleMessage = undefined;
-            }
+            disableConsoleMsg: function () { page.onConsoleMessage = undefined; },
+            index: function () { return Object.keys(this); }
         };
         var obj = fnMap[data.type];
         if (typeof obj === 'function') {
@@ -66,14 +62,9 @@
         page.settings.userAgent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.120 Safari/537.36';
 
         page.evaluate(function () {
-            var phantomInnerAPI = {};
-            if (typeof window.callPhantom !== 'function')
-                throw new Error("could not find window.callPhantom");
-            phantomInnerAPI.callPhantom = window.callPhantom;
-            delete window.callPhantom;
             function callHost(method) {
                 var args = Array.prototype.slice.call(arguments, 1);
-                var res = phantomInnerAPI.callPhantom({
+                var res = callHost.callPhantom({
                     'type': method,
                     'args': args
                 });
@@ -84,7 +75,12 @@
                 else
                     throw new Error("callPhanton unknown result: ".concat(res.result));
             }
-            ['exit', 'writeError', 'writeDebug', 'writeLog', 'disableConsoleMsg'].forEach(
+            if (typeof window.callPhantom !== 'function')
+                throw new Error("could not find window.callPhantom");
+            callHost.callPhantom = window.callPhantom;
+            delete window.callPhantom;
+            var phantomInnerAPI = {};
+            callHost('index').forEach(
                 function (method) {
                     phantomInnerAPI[method] = function () {
                         return callHost.apply(null, [method].concat(Array.prototype.slice.call(arguments)));
