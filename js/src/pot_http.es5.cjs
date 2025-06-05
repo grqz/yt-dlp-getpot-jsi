@@ -260,10 +260,14 @@ function fetchChallenge(resolve, reject) {
     } else {
         compatFetch(function (respRaw) {
             if (!respRaw.ok)
-                return reject(new Error('Could not get challenge'));;
+                return reject(new Error('Could not get challenge'));
             respRaw.json(function (respJson) {
-                if (!respJson || respJson.error)
-                    return reject(new Error('Could not get challenge' + (respJson && respJson.error && ': '.concat(respJson.error)) || ''));
+                if (!respJson || respJson.error) {
+                    var err = 'Could not get challenge';
+                    if (respJson && respJson.error)
+                        err += ': ' + respJson.error;
+                    return reject(new Error(err));
+                }
                 resolve({
                     ijs: respJson.interpreterJavascript.privateDoNotAccessOrElseSafeScriptWrappedValue,
                     uie: respJson.userInteractionElement,
@@ -383,8 +387,11 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
                     integrityTokenResponse.json(function (integrityTokenJson) {
                         writeDebug('ITJ', JSON.stringify(integrityTokenJson));
                         if (!integrityTokenResponse.ok || !integrityTokenJson) {
-                            writeError('Failed to get integrity token response:', (integrityTokenResponse && integrityTokenResponse.error) || '')
-                            exit(1);
+                            var err = 'Failed to get integrity token response: ';
+                            if (integrityTokenResponse && integrityTokenResponse.error)
+                                err += ': ' + integrityTokenResponse.error;
+                            writeError(err);
+                            return exit(1);
                         }
                         if (typeof integrityTokenJson.integrityToken !== 'string') {
                             writeError('Could not get integrity token');
@@ -425,15 +432,15 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
                     body: JSON.stringify(botguardResponse)
                 });
             }, function (err) {
-                writeError('Snapshot failed:', err);
+                writeError('Snapshot failed: ' + err);
                 exit(1);
             }, bg.vmFns, { webPoSignalOutput: webPoSignalOutput });
         }, function (err) {
-            writeError('Error loading VM', err);
+            writeError('Error loading VM: ' + err);
             exit(1);
         }, globalObj[chl.vmn], chl.prg, chl.uie);
     }, function (err) {
-        writeError('Failed to parse challenge:', err);
+        writeError('Failed to parse challenge: ' + err);
         exit(1);
     });
 })();
