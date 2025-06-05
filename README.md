@@ -2,7 +2,7 @@ A yt-dlp plugin that attempts to generate POT with the phantomjs Javascript Inte
 
 The javascript part is basically a backport of [LuanRT/BgUtils](https://github.com/LuanRT/BgUtils). The [_Research_](https://github.com/LuanRT/BgUtils?tab=readme-ov-file#research) section of its README helped a lot when developing this plugin.
 
-Current status: works with an HTTP server on the python side, ideally making only one request.
+Current status: works with an HTTP server on the python side.
 
 # Installing
 

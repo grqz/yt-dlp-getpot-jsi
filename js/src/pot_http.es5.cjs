@@ -22,12 +22,12 @@ if (typeof phantomInnerAPI !== 'undefined') {
     writeLog = phantomInnerAPI.writeLog;
     if (embeddedInputData.NDEBUG) {
         writeDebug = nop;
-        phantomInnerAPI.disableConsoleMsg();
+        phantomInnerAPI.disableDebugging();
     } else {
         writeDebug = phantomInnerAPI.writeDebug;
     }
 } else {
-    writeError = function () { return console.trace.apply(console, arguments); };
+    writeError = function () { console.error.apply(console, arguments); return console.trace(); };
     writeDebug = embeddedInputData.NDEBUG ? nop : function () { return console.debug.apply(console, arguments); };
     writeLog = function () { return console.log.apply(console, arguments); };
     if (typeof phantom !== 'undefined')
@@ -57,15 +57,12 @@ if (typeof phantomInnerAPI !== 'undefined') {
         exit = nop;
 }
 
-// Currently, we only support fetch for a custom UA
-// TODO: do requests natively
-var doRequestsNatively = typeof fetch === 'function';
-
 function compatFetch(resolve, reject, url, req) {
     req = req || {};
     req.method = req.method ? req.method.toUpperCase() : (req.body ? 'POST' : 'GET');
     req.headers = req.headers || {};
     req.body = req.body || null;
+    req.timeout = req.timeout || 3000;
     if (typeof fetch === 'function') {
         writeDebug('FETCH', url);
         fetch(url, req).then(function (response) {
@@ -87,20 +84,55 @@ function compatFetch(resolve, reject, url, req) {
         }).then(resolve).catch(reject);
     } else if (typeof XMLHttpRequest !== 'undefined') {
         writeDebug('XHR', url);
-        xhr = new XMLHttpRequest();
+        var xhr;
+        try {
+            xhr = new XMLHttpRequest();
+        } catch (err) {
+            return reject(err);
+        }
         xhr.open(req.method, url, true);
         for (var hdr in req.headers) {
-            if (hdr.toLowerCase() === 'user-agent') return reject('UA not supported');
-            xhr.setRequestHeader(hdr, req.headers[hdr]);
+            if (hdr.toLowerCase() === 'user-agent') {
+                if (typeof phantomInnerAPI === 'undefined')
+                    return reject(new Error('UA is not supported'));
+                else
+                    phantomInnerAPI.setUA(req.headers[hdr]);
+            } else {
+                xhr.setRequestHeader(hdr, req.headers[hdr]);
+            }
         }
+        writeDebug('XHR HDRSET');
         var doneCallbacks = [];
+        var timeoutId;
+        if (req && typeof req.timeout === 'number') {
+            xhr.timeout = req.timeout;
+            if (typeof phantom !== 'undefined' || typeof phantomInnerAPI !== 'undefined') {
+                // phantomjs doesn't seem to support XHR with timeout
+                timeoutId = setTimeout(function () {
+                    xhr.abort();
+                    if (typeof xhr.ontimeout === 'function')
+                        xhr.ontimeout();
+                    writeDebug('XHR TIMEDOUT ' + url);
+                }, req.timeout);
+            }
+            writeDebug('XHR SETTIMEOUT ' + req.timeout);
+        }
+
+        var resolveWrapped = function (args) {
+            if (timeoutId) clearTimeout(timeoutId);
+            return resolve(args);
+        };
+        var rejectWrapped = function (args) {
+            if (timeoutId) clearTimeout(timeoutId);
+            return reject(args);
+        };
         xhr.onreadystatechange = function () {
-            if (xhr.readyState === 2) {
-                resolve({
+            if (xhr.readyState === XMLHttpRequest.HEADERS_RECEIVED) {
+                resolveWrapped({
                     ok: (xhr.status >= 200 && xhr.status < 300),
                     status: xhr.status,
                     url: xhr.responseUrl,
-                    text: function (resolveInner, rejectInner) {
+                    text: function (resolveInner, _rejectInner) {
                         doneCallbacks.push(resolveInner);
                     },
                     json: function (resolveInner, rejectInner) {
@@ -121,33 +153,33 @@ function compatFetch(resolve, reject, url, req) {
                         _raw: xhr.getAllResponseHeaders()
                     }
                 });
-            } else if (xhr.readyState === 4) {
-                doneCallbacks = doneCallbacks.filter(function (x) {
-                    if (typeof x === 'function')
-                        x(xhr.responseText);
-                    return false;
-                });
-            }
+            } else if (xhr.readyState === XMLHttpRequest.DONE) {
+                setTimeout(function () {
+                    doneCallbacks = doneCallbacks.filter(function (x) {
+                        if (typeof x === 'function')
+                            x(xhr.responseText);
+                        return false;
+                    });
+                }, 0);
+            } else return;
+            writeDebug('XHR RS ' + xhr.readyState + ' ' + url);
         };
         xhr.onerror = function () {
-            reject(new Error('XHR failed'));
+            rejectWrapped(new Error('XHR failed'));
         };
 
-        if (req && typeof req.timeout === 'number') {
-            xhr.timeout = req.timeout;
-        }
-
         xhr.ontimeout = function () {
-            reject(new Error('XHR timed out'));
+            rejectWrapped(new Error('XHR timed out'));
         };
 
         try {
             xhr.send(req.body);
         } catch (err) {
-            reject(err);
+            return rejectWrapped(err);
         }
+        writeDebug('XHR SENT');
     } else {
-        reject(new Error('Could not find available networking API.'));
+        return reject(new Error('Could not find available networking API.'));
     }
 }
 
@@ -169,7 +201,7 @@ function b64ToUTF8Arr(b64) {
     } else {
         b64Mod = b64;
     }
-    var b64Mod = atob(b64Mod);
+    b64Mod = atob(b64Mod);
     var ret = [];
     b64Mod.split('').forEach(function (chr) {
         ret.push(chr.charCodeAt(0));
@@ -205,13 +237,14 @@ function buildPOTServerURL(path) {
 }
 
 function fetchChallenge(resolve, reject) {
-    if (embeddedInputData.ytAtR !== null) {
-        var interpUrl = embeddedInputData.ytAtR.bgChallenge.interpreterUrl.privateDoNotAccessOrElseTrustedResourceUrlWrappedValue;
+    if (embeddedInputData.ytAtR) {
+        writeDebug('FETCH_CHL ytAtR');
+        var bgChallenge = embeddedInputData.ytAtR.bgChallenge;
+        var interpUrl = bgChallenge.interpreterUrl.privateDoNotAccessOrElseTrustedResourceUrlWrappedValue;
         compatFetch(function (respRaw) {
             if (!respRaw.ok)
                 return reject(new Error('Could not get challenge'));
             respRaw.text(function (respText) {
-                var bgChallenge = embeddedInputData.ytAtR.bgChallenge;
                 resolve({
                     ijs: respText,
                     uie: bgChallenge.userInteractionElement,
@@ -223,10 +256,14 @@ function fetchChallenge(resolve, reject) {
     } else {
         compatFetch(function (respRaw) {
             if (!respRaw.ok)
-                return reject(new Error('Could not get challenge'));;
+                return reject(new Error('Could not get challenge'));
             respRaw.json(function (respJson) {
-                if (!respJson || respJson.error)
-                    return reject(new Error('Could not get challenge' + (respJson && respJson.error && ': '.concat(respJson.error)) || ''));
+                if (!respJson || respJson.error) {
+                    var err = 'Could not get challenge';
+                    if (respJson && respJson.error)
+                        err += ': ' + respJson.error;
+                    return reject(new Error(err));
+                }
                 resolve({
                     ijs: respJson.interpreterJavascript.privateDoNotAccessOrElseSafeScriptWrappedValue,
                     uie: respJson.userInteractionElement,
@@ -240,9 +277,9 @@ function fetchChallenge(resolve, reject) {
 
 function load(resolve, reject, vm, program, userInteractionElement) {
     if (!vm)
-        reject(new Error('VM not found'));
+        return reject(new Error('VM not found'));
     if (!vm.a)
-        reject(new Error('VM init function not found'));
+        return reject(new Error('VM init function not found'));
     var vmFns;
     var asyncResolved = false;
     var syncResolved = false;
@@ -251,7 +288,7 @@ function load(resolve, reject, vm, program, userInteractionElement) {
         if (asyncResolved && syncResolved) {
             resolve({
                 syncSnapshotFunction: syncSnapshotFunction,
-                vmFns: vmFns,
+                vmFns: vmFns
             });
         }
     }
@@ -303,18 +340,18 @@ function snapshot(resolve, reject, vmFns, args, timeout) {
 function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput) {
     var getMinter = webPoSignalOutput[0];
     if (!getMinter)
-        reject(new Error('PMD:Undefined'));
+        return reject(new Error('PMD:Undefined'));
     if (!integrityTokenData.integrityToken)
-        reject(new Error('No integrity token provided'));
+        return reject(new Error('No integrity token provided'));
     var mintCallback = getMinter(b64ToUTF8Arr(integrityTokenData.integrityToken));
     if (typeof mintCallback !== 'function')
-        reject(new Error('APF:Failed'));
+        return reject(new Error('APF:Failed'));
     resolve(function (resolveInner, rejectInner, identifier) {
         var result = mintCallback(encodeASCII(identifier));
         if (!result)
-            rejectInner(new Error('YNJ:Undefined'));
+            return rejectInner(new Error('YNJ:Undefined'));
         if (!(result instanceof Uint8Array))
-            rejectInner(new Error('ODM:Invalid'));
+            return rejectInner(new Error('ODM:Invalid'));
         resolveInner(UTF8ArrToB64(result, true));
     });
 }
@@ -324,7 +361,7 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
     var identifiers = embeddedInputData.content_bindings;
     if (!identifiers.length) {
         writeLog('[]');
-        exit(0);
+        return exit(0);
     }
     fetchChallenge(function (chl) {
         writeDebug('CHL');
@@ -332,7 +369,7 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
             new Function(chl.ijs)();
         } else {
             writeError('Could not load VM');
-            exit(1);
+            return exit(1);
         }
         writeDebug('VM_LOADED', JSON.stringify(globalObj[chl.vmn]));
         writeDebug('VM_INIT_FN', globalObj[chl.vmn] && typeof globalObj[chl.vmn].a);
@@ -346,17 +383,20 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
                     integrityTokenResponse.json(function (integrityTokenJson) {
                         writeDebug('ITJ', JSON.stringify(integrityTokenJson));
                         if (!integrityTokenResponse.ok || !integrityTokenJson) {
-                            writeError('Failed to get integrity token response:', (integrityTokenResponse && integrityTokenResponse.error) || '')
-                            exit(1);
+                            var errMsg = 'Failed to get integrity token response: ';
+                            if (integrityTokenResponse && integrityTokenResponse.error)
+                                errMsg += ': ' + integrityTokenResponse.error;
+                            writeError(errMsg);
+                            return exit(1);
                         }
                         if (typeof integrityTokenJson.integrityToken !== 'string') {
                             writeError('Could not get integrity token');
-                            exit(1);
+                            return exit(1);
                         }
                         getWebSafeMinter(function (webSafeMinter) {
                             var pots = [];
                             function exitIfCompleted() {
-                                if (Object.keys(pots).length == identifiers.length) {
+                                if (Object.keys(pots).length === identifiers.length) {
                                     writeLog(JSON.stringify(pots));
                                     exit(+(pots.indexOf(null) !== -1));
                                 }
@@ -388,15 +428,15 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
                     body: JSON.stringify(botguardResponse)
                 });
             }, function (err) {
-                writeError('Snapshot failed:', err);
+                writeError('Snapshot failed: ' + err);
                 exit(1);
             }, bg.vmFns, { webPoSignalOutput: webPoSignalOutput });
         }, function (err) {
-            writeError('Error loading VM', err);
+            writeError('Error loading VM: ' + err);
             exit(1);
         }, globalObj[chl.vmn], chl.prg, chl.uie);
     }, function (err) {
-        writeError('Failed to parse challenge:', err);
+        writeError('Failed to parse challenge: ' + err);
         exit(1);
     });
 })();
