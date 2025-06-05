@@ -44,12 +44,12 @@
         } else if (typeof obj === 'undefined') {
             ret.result = 'error';
             ret.error = 'object is undefined';
-            console.log("onCallback error:", ret.error);
+            console.log('onCallback error: ' + ret.error);
             return ret;
         } else {
             ret.result = 'error';
-            ret.error = 'unknown object type: '.concat(typeof obj);
-            console.log("onCallback error:", ret.error);
+            ret.error = 'unknown object type: ' + typeof obj;
+            console.log('onCallback error: ' + ret.error);
             return ret;
         }
     };
