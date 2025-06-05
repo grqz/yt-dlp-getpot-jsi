@@ -2,6 +2,8 @@
     'use strict';
     if (typeof phantom === 'undefined')
         throw new Error('This script must be run in phantomjs');
+    var UA =
+        'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.120 Safari/537.36';
     var page = require('webpage').create();
 
     // {
@@ -58,14 +60,17 @@
         console.log('CONSOLE: ' + msg);
     };
 
+    page.customHeaders['User-Agent'] = page.settings.userAgent = UA;
+
     page.open('about:blank', function (status) {
         if (status !== 'success') {
             console.error('Failed to load the page');
             phantom.exit();
             return;
         }
-        page.setContent('<!DOCTYPE html><html lang="en"><head><title></title></head><body></body></html>', 'https://www.youtube.com/');
-        page.settings.userAgent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.120 Safari/537.36';
+        page.setContent(
+            '<!DOCTYPE html><html lang="en"><head><title></title></head><body></body></html>',
+            'https://www.youtube.com/');
 
         page.evaluate(function () {
             'use strict';
