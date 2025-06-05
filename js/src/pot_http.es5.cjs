@@ -57,10 +57,6 @@ if (typeof phantomInnerAPI !== 'undefined') {
         exit = nop;
 }
 
-// Currently, we only support fetch for a custom UA
-// TODO: do requests natively
-// var doRequestsNatively = typeof fetch === 'function';
-
 function compatFetch(resolve, reject, url, req) {
     req = req || {};
     req.method = req.method ? req.method.toUpperCase() : (req.body ? 'POST' : 'GET');
@@ -373,7 +369,7 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
             new Function(chl.ijs)();
         } else {
             writeError('Could not load VM');
-            exit(1);
+            return exit(1);
         }
         writeDebug('VM_LOADED', JSON.stringify(globalObj[chl.vmn]));
         writeDebug('VM_INIT_FN', globalObj[chl.vmn] && typeof globalObj[chl.vmn].a);

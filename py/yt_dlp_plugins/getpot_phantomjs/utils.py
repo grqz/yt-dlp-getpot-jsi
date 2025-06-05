@@ -111,17 +111,13 @@ class BG:
         })
 
 
-if NDEBUG:
-    def timed(func):
-        return func
-else:
-    def timed(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            start = time.perf_counter()
-            try:
-                return func(*args, **kwargs)
-            finally:
-                end = time.perf_counter()
-                print(f'{func.__name__} took {end - start:.6f} seconds')
-        return wrapper
+def timed(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        try:
+            return func(*args, **kwargs)
+        finally:
+            end = time.perf_counter()
+            print(f'{func.__name__} took {end - start:.6f} seconds')
+    return wrapper
