@@ -205,7 +205,7 @@ function b64ToUTF8Arr(b64) {
     } else {
         b64Mod = b64;
     }
-    var b64Mod = atob(b64Mod);
+    b64Mod = atob(b64Mod);
     var ret = [];
     b64Mod.split('').forEach(function (chr) {
         ret.push(chr.charCodeAt(0));
@@ -241,13 +241,14 @@ function buildPOTServerURL(path) {
 }
 
 function fetchChallenge(resolve, reject) {
-    if (embeddedInputData.ytAtR !== null) {
-        var interpUrl = embeddedInputData.ytAtR.bgChallenge.interpreterUrl.privateDoNotAccessOrElseTrustedResourceUrlWrappedValue;
+    if (embeddedInputData.ytAtR) {
+        writeDebug('FETCH_CHL ytAtR');
+        var bgChallenge = embeddedInputData.ytAtR.bgChallenge;
+        var interpUrl = bgChallenge.interpreterUrl.privateDoNotAccessOrElseTrustedResourceUrlWrappedValue;
         compatFetch(function (respRaw) {
             if (!respRaw.ok)
                 return reject(new Error('Could not get challenge'));
             respRaw.text(function (respText) {
-                var bgChallenge = embeddedInputData.ytAtR.bgChallenge;
                 resolve({
                     ijs: respText,
                     uie: bgChallenge.userInteractionElement,

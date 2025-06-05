@@ -1,6 +1,6 @@
 (function () {
     if (typeof phantom === 'undefined')
-        throw new Error("This script must be run in phantomjs");
+        throw new Error('This script must be run in phantomjs');
     var page = require('webpage').create();
 
     // {
@@ -67,6 +67,7 @@
         page.settings.userAgent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.120 Safari/537.36';
 
         page.evaluate(function () {
+            'use strict';
             function callHost(method) {
                 var args = Array.prototype.slice.call(arguments, 1);
                 var res = callHost.callPhantom({
@@ -74,14 +75,14 @@
                     'args': args
                 });
                 if (res.result === 'error')
-                    throw new Error("callPhantom failure:".concat(res.error));
+                    throw new Error('callPhantom failure: ' + res.error);
                 else if (res.result === 'success')
                     return res.value;
                 else
-                    throw new Error("callPhanton unknown result: ".concat(res.result));
+                    throw new Error('callPhanton unknown result: ' + res.result);
             }
             if (typeof window.callPhantom !== 'function')
-                throw new Error("could not find window.callPhantom");
+                throw new Error('Could not find window.callPhantom');
             callHost.callPhantom = window.callPhantom;
             delete window.callPhantom;
             var phantomInnerAPI = {};
@@ -92,7 +93,7 @@
                     };
                 }
             );
-            /*__PLACEHOLDER_REPLACE_WITH_SCRIPT_CONTENT__*/
+/*__PLACEHOLDER_REPLACE_WITH_SCRIPT_CONTENT__*/
         });
     });
 })();
