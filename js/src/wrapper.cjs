@@ -26,8 +26,13 @@
             writeError: function () { return console.trace.apply(console, arguments); },
             writeDebug: function () { return console.debug.apply(console, arguments); },
             writeLog: function () { return console.log.apply(console, arguments); },
-            disableConsoleMsg: function () { page.onConsoleMessage = undefined; },
-            index: function () { return Object.keys(this); }
+            disableDebugging: function () {
+                page.onConsoleMessage = undefined;
+            },
+            index: function () { return Object.keys(this); }//,
+            // setUA: function (ua) {
+            //     return page.settings.userAgent = page.customHeaders['User-Agent'] = ua;
+            // }
         };
         var obj = fnMap[data.type];
         if (typeof obj === 'function') {

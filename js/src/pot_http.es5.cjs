@@ -22,12 +22,12 @@ if (typeof phantomInnerAPI !== 'undefined') {
     writeLog = phantomInnerAPI.writeLog;
     if (embeddedInputData.NDEBUG) {
         writeDebug = nop;
-        phantomInnerAPI.disableConsoleMsg();
+        phantomInnerAPI.disableDebugging();
     } else {
         writeDebug = phantomInnerAPI.writeDebug;
     }
 } else {
-    writeError = function () { return console.trace.apply(console, arguments); };
+    writeError = function () { console.error.apply(console, arguments); return console.trace(); };
     writeDebug = embeddedInputData.NDEBUG ? nop : function () { return console.debug.apply(console, arguments); };
     writeLog = function () { return console.log.apply(console, arguments); };
     if (typeof phantom !== 'undefined')
