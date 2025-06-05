@@ -387,10 +387,10 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
                     integrityTokenResponse.json(function (integrityTokenJson) {
                         writeDebug('ITJ', JSON.stringify(integrityTokenJson));
                         if (!integrityTokenResponse.ok || !integrityTokenJson) {
-                            var err = 'Failed to get integrity token response: ';
+                            var errMsg = 'Failed to get integrity token response: ';
                             if (integrityTokenResponse && integrityTokenResponse.error)
-                                err += ': ' + integrityTokenResponse.error;
-                            writeError(err);
+                                errMsg += ': ' + integrityTokenResponse.error;
+                            writeError(errMsg);
                             return exit(1);
                         }
                         if (typeof integrityTokenJson.integrityToken !== 'string') {

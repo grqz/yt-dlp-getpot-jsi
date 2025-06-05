@@ -6,22 +6,15 @@
         'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.120 Safari/537.36';
     var page = require('webpage').create();
 
-    // {
-    //   type: "method name",
-    //   args: variadic: Array or single element,
-    // }
-    page.onCallback = function (data) {
+    // method: "method name",
+    // args: variadic: Array or single argument
+    page.onCallback = function (method, args) {
+        args = Array.isArray(args) ? args : [args];
         var ret = {};
-        if (typeof data !== 'object' && !Array.isArray(data)) {
+        if (typeof method !== 'string') {
             ret.result = 'error';
-            ret.error = 'data is not an object';
-            console.log("onCallback error:", ret.error);
-            return ret;
-        }
-        if (typeof data.type !== 'string') {
-            ret.result = 'error';
-            ret.error = 'data.type is not a string';
-            console.log("onCallback error:", ret.error);
+            ret.error = 'method is not a string';
+            console.log('onCallback error: ' + ret.error);
             return ret;
         }
         var fnMap = {
@@ -32,16 +25,16 @@
             disableDebugging: function () {
                 page.onConsoleMessage = undefined;
             },
-            index: function () { return Object.keys(this); }//,
-            // setUA: function (ua) {
-            //     return page.settings.userAgent = page.customHeaders['User-Agent'] = ua;
-            // }
+            index: function () { return Object.keys(this); },
+            setUA: function (ua) {
+                return page.settings.userAgent = page.customHeaders['User-Agent'] = ua;
+            }
         };
-        var obj = fnMap[data.type];
+        var obj = fnMap[method];
+        ret.objType = typeof obj;
         if (typeof obj === 'function') {
             ret.result = 'success';
-            ret.objType = 'function';
-            ret.value = obj.apply(fnMap, Array.isArray(data.args) ? data.args : [data.args]);
+            ret.value = obj.apply(fnMap, args);
             return ret;
         } else if (typeof obj === 'undefined') {
             ret.result = 'error';
@@ -75,11 +68,7 @@
         page.evaluate(function () {
             'use strict';
             function callHost(method) {
-                var args = Array.prototype.slice.call(arguments, 1);
-                var res = callHost.callPhantom({
-                    'type': method,
-                    'args': args
-                });
+                var res = callHost.callPhantom.call(window, method, Array.prototype.slice.call(arguments, 1));
                 if (res.result === 'error')
                     throw new Error('callPhantom failure: ' + res.error);
                 else if (res.result === 'success')
