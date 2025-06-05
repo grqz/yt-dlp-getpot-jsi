@@ -59,13 +59,14 @@ if (typeof phantomInnerAPI !== 'undefined') {
 
 // Currently, we only support fetch for a custom UA
 // TODO: do requests natively
-var doRequestsNatively = typeof fetch === 'function';
+// var doRequestsNatively = typeof fetch === 'function';
 
 function compatFetch(resolve, reject, url, req) {
     req = req || {};
     req.method = req.method ? req.method.toUpperCase() : (req.body ? 'POST' : 'GET');
     req.headers = req.headers || {};
     req.body = req.body || null;
+    req.timeout = req.timeout || 3000;
     if (typeof fetch === 'function') {
         writeDebug('FETCH', url);
         fetch(url, req).then(function (response) {
@@ -87,20 +88,55 @@ function compatFetch(resolve, reject, url, req) {
         }).then(resolve).catch(reject);
     } else if (typeof XMLHttpRequest !== 'undefined') {
         writeDebug('XHR', url);
-        xhr = new XMLHttpRequest();
+        var xhr;
+        try {
+            xhr = new XMLHttpRequest();
+        } catch (err) {
+            return reject(err);
+        }
         xhr.open(req.method, url, true);
         for (var hdr in req.headers) {
-            if (hdr.toLowerCase() === 'user-agent') return reject('UA not supported');
-            xhr.setRequestHeader(hdr, req.headers[hdr]);
+            if (hdr.toLowerCase() === 'user-agent') {
+                if (typeof phantomInnerAPI === 'undefined')
+                    return reject(new Error('UA is not supported'));
+                else
+                    phantomInnerAPI.setUA(req.headers[hdr]);
+            } else {
+                xhr.setRequestHeader(hdr, req.headers[hdr]);
+            }
         }
+        writeDebug('XHR HDRSET');
         var doneCallbacks = [];
+        var timeoutId;
+        if (req && typeof req.timeout === 'number') {
+            xhr.timeout = req.timeout;
+            if (typeof phantom !== 'undefined' || typeof phantomInnerAPI !== 'undefined') {
+                // phantomjs doesn't seem to support XHR with timeout
+                timeoutId = setTimeout(function () {
+                    xhr.abort();
+                    if (typeof xhr.ontimeout === 'function')
+                        xhr.ontimeout();
+                    writeDebug('XHR TIMEDOUT ' + url);
+                }, req.timeout);
+            }
+            writeDebug('XHR SETTIMEOUT ' + req.timeout);
+        }
+
+        var resolveWrapped = function (args) {
+            if (timeoutId) clearTimeout(timeoutId);
+            return resolve(args);
+        };
+        var rejectWrapped = function (args) {
+            if (timeoutId) clearTimeout(timeoutId);
+            return reject(args);
+        };
         xhr.onreadystatechange = function () {
-            if (xhr.readyState === 2) {
-                resolve({
+            if (xhr.readyState === XMLHttpRequest.HEADERS_RECEIVED) {
+                resolveWrapped({
                     ok: (xhr.status >= 200 && xhr.status < 300),
                     status: xhr.status,
                     url: xhr.responseUrl,
-                    text: function (resolveInner, rejectInner) {
+                    text: function (resolveInner, _rejectInner) {
                         doneCallbacks.push(resolveInner);
                     },
                     json: function (resolveInner, rejectInner) {
@@ -121,33 +157,33 @@ function compatFetch(resolve, reject, url, req) {
                         _raw: xhr.getAllResponseHeaders()
                     }
                 });
-            } else if (xhr.readyState === 4) {
-                doneCallbacks = doneCallbacks.filter(function (x) {
-                    if (typeof x === 'function')
-                        x(xhr.responseText);
-                    return false;
-                });
-            }
+            } else if (xhr.readyState === XMLHttpRequest.DONE) {
+                setTimeout(function () {
+                    doneCallbacks = doneCallbacks.filter(function (x) {
+                        if (typeof x === 'function')
+                            x(xhr.responseText);
+                        return false;
+                    });
+                }, 0);
+            } else return;
+            writeDebug('XHR RS ' + xhr.readyState + ' ' + url);
         };
         xhr.onerror = function () {
-            reject(new Error('XHR failed'));
+            rejectWrapped(new Error('XHR failed'));
         };
 
-        if (req && typeof req.timeout === 'number') {
-            xhr.timeout = req.timeout;
-        }
-
         xhr.ontimeout = function () {
-            reject(new Error('XHR timed out'));
+            rejectWrapped(new Error('XHR timed out'));
         };
 
         try {
             xhr.send(req.body);
         } catch (err) {
-            reject(err);
+            return rejectWrapped(err);
         }
+        writeDebug('XHR SENT');
     } else {
-        reject(new Error('Could not find available networking API.'));
+        return reject(new Error('Could not find available networking API.'));
     }
 }
 
