@@ -277,9 +277,9 @@ function fetchChallenge(resolve, reject) {
 
 function load(resolve, reject, vm, program, userInteractionElement) {
     if (!vm)
-        reject(new Error('VM not found'));
+        return reject(new Error('VM not found'));
     if (!vm.a)
-        reject(new Error('VM init function not found'));
+        return reject(new Error('VM init function not found'));
     var vmFns;
     var asyncResolved = false;
     var syncResolved = false;
@@ -288,7 +288,7 @@ function load(resolve, reject, vm, program, userInteractionElement) {
         if (asyncResolved && syncResolved) {
             resolve({
                 syncSnapshotFunction: syncSnapshotFunction,
-                vmFns: vmFns,
+                vmFns: vmFns
             });
         }
     }
@@ -340,18 +340,18 @@ function snapshot(resolve, reject, vmFns, args, timeout) {
 function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput) {
     var getMinter = webPoSignalOutput[0];
     if (!getMinter)
-        reject(new Error('PMD:Undefined'));
+        return reject(new Error('PMD:Undefined'));
     if (!integrityTokenData.integrityToken)
-        reject(new Error('No integrity token provided'));
+        return reject(new Error('No integrity token provided'));
     var mintCallback = getMinter(b64ToUTF8Arr(integrityTokenData.integrityToken));
     if (typeof mintCallback !== 'function')
-        reject(new Error('APF:Failed'));
+        return reject(new Error('APF:Failed'));
     resolve(function (resolveInner, rejectInner, identifier) {
         var result = mintCallback(encodeASCII(identifier));
         if (!result)
-            rejectInner(new Error('YNJ:Undefined'));
+            return rejectInner(new Error('YNJ:Undefined'));
         if (!(result instanceof Uint8Array))
-            rejectInner(new Error('ODM:Invalid'));
+            return rejectInner(new Error('ODM:Invalid'));
         resolveInner(UTF8ArrToB64(result, true));
     });
 }
@@ -361,7 +361,7 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
     var identifiers = embeddedInputData.content_bindings;
     if (!identifiers.length) {
         writeLog('[]');
-        exit(0);
+        return exit(0);
     }
     fetchChallenge(function (chl) {
         writeDebug('CHL');
@@ -388,12 +388,12 @@ function getWebSafeMinter(resolve, reject, integrityTokenData, webPoSignalOutput
                         }
                         if (typeof integrityTokenJson.integrityToken !== 'string') {
                             writeError('Could not get integrity token');
-                            exit(1);
+                            return exit(1);
                         }
                         getWebSafeMinter(function (webSafeMinter) {
                             var pots = [];
                             function exitIfCompleted() {
-                                if (Object.keys(pots).length == identifiers.length) {
+                                if (Object.keys(pots).length === identifiers.length) {
                                     writeLog(JSON.stringify(pots));
                                     exit(+(pots.indexOf(null) !== -1));
                                 }

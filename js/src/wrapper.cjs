@@ -1,4 +1,5 @@
 (function () {
+    'use strict';
     if (typeof phantom === 'undefined')
         throw new Error('This script must be run in phantomjs');
     var page = require('webpage').create();
