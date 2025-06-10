@@ -3,11 +3,13 @@ import socket
 import threading
 import traceback
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 from .utils import BG
 
 
 class POTHTTPServer:
+    _INTERPRETER_CACHE = {}
+
     def __init__(self, Request, urlopen, log, port=0):
         bg = BG(Request, urlopen)
 
@@ -35,6 +37,33 @@ class POTHTTPServer:
                         self.send_header('Access-Control-Allow-Origin', '*')
                         self.end_headers()
                         self.wfile.write(descrambled)
+                elif real_path == '/dl_js':
+                    try:
+                        js_url = parse_qs(parsed_url.query).get('url', [None])[0]
+                        if not js_url:
+                            raise ValueError('Missing "url" query parameter')
+                        cached_ijsbytes = POTHTTPServer._INTERPRETER_CACHE.get(js_url)
+                        if cached_ijsbytes is not None:
+                            self.send_response(200)
+                            self.send_header('Access-Control-Allow-Origin', '*')
+                            self.end_headers()
+                            self.wfile.write(cached_ijsbytes)
+                            return
+                        log(f'Cache miss for JS: {js_url}, downloading...')
+                        POTHTTPServer._INTERPRETER_CACHE[js_url] = ijsbytes = urlopen(Request(js_url)).read()
+                        self.send_response(200)
+                        self.send_header('Access-Control-Allow-Origin', '*')
+                        self.end_headers()
+                        self.wfile.write(ijsbytes)
+                    except Exception as e:
+                        traceback.print_exc()
+                        self.send_response(500)
+                        self.send_header('Access-Control-Allow-Origin', '*')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({
+                            'error': str(e),
+                        }).encode())
+                        return
                 else:
                     self.send_response(404)
                     self.send_header('Access-Control-Allow-Origin', '*')

@@ -252,7 +252,7 @@ function fetchChallenge(resolve, reject) {
                     prg: bgChallenge.program
                 });
             }, reject);
-        }, reject, 'https:'.concat(interpUrl));
+        }, reject, buildPOTServerURL('/dl_js?url=' + encodeURIComponent('https:' + interpUrl)));
     } else {
         compatFetch(function (respRaw) {
             if (!respRaw.ok)
