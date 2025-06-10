@@ -53,4 +53,4 @@ For more locations and methods, see [installing yt-dlp plugins](<https://github.
 
 If installed correctly, you should see the provider's version in `yt-dlp -v` output:
 
-    [debug] [youtube] [pot] PO Token Providers: phantomjs-web-0.3.0 (external)
+    [debug] [youtube] [pot] PO Token Providers: phantomjs-web-0.3.1 (external)
