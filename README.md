@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> This repository was archived and stopped working as of October 2025 (see <https://github.com/grqz/yt-dlp-getpot-jsi/issues/8>). You are welcome to fork and maintain the project if you wish. For any questions regarding the project, please open an issue [here](<https://github.com/grqz/grqz/issues/new>).
+
 A yt-dlp plugin that attempts to generate POT with the phantomjs Javascript Interpreter.
 
 The javascript part is basically a backport of [LuanRT/BgUtils](https://github.com/LuanRT/BgUtils). The [_Research_](https://github.com/LuanRT/BgUtils?tab=readme-ov-file#research) section of its README helped a lot when developing this plugin.
@@ -54,3 +57,4 @@ For more locations and methods, see [installing yt-dlp plugins](<https://github.
 If installed correctly, you should see the provider's version in `yt-dlp -v` output:
 
     [debug] [youtube] [pot] PO Token Providers: phantomjs-web-0.3.1 (external)
+
